@@ -7,6 +7,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE Unsafe #-}
+{-# LANGUAGE InstanceSigs #-}
 
 module Data.Propagator.Prop
   ( Prop(..)
@@ -42,52 +43,80 @@ data Prop s a where
   Binary  :: Propagated c => (Cell s a -> Cell s b -> Cell s c -> ST s ()) -> Prop s a -> Prop s b -> Prop s c
 
 instance (PropagatedNum a, Eq a, Num a) => Num (Prop s a) where
+  (+) :: (PropagatedNum a, Eq a, Num a) => Prop s a -> Prop s a -> Prop s a
   (+) = Binary cplus
+  (-) :: (PropagatedNum a, Eq a, Num a) => Prop s a -> Prop s a -> Prop s a
   (-) = Binary $ \z x y -> cplus x y z
+  (*) :: (PropagatedNum a, Eq a, Num a) => Prop s a -> Prop s a -> Prop s a
   (*) = Binary ctimes
+  negate :: (PropagatedNum a, Eq a, Num a) => Prop s a -> Prop s a
   negate = Unary $ \x y -> do
     lift1 negate x y
     lift1 negate y x
+  signum :: (PropagatedNum a, Eq a, Num a) => Prop s a -> Prop s a
   signum = Unary $ \x y -> do
     lift1 signum x y
     watch y $ \b -> when (b == 0) $ write x 0
+  abs :: (PropagatedNum a, Eq a, Num a) => Prop s a -> Prop s a
   abs = Unary cabs
+  fromInteger :: (PropagatedNum a, Eq a, Num a) => Integer -> Prop s a
   fromInteger i = Nullary (known $ fromInteger i)
 
 instance (PropagatedNum a, Eq a, Fractional a) => Fractional (Prop s a) where
+  (/) :: (PropagatedNum a, Eq a, Fractional a) => Prop s a -> Prop s a -> Prop s a
   (/) = Binary $ \x y z -> ctimes z y x
+  recip :: (PropagatedNum a, Eq a, Fractional a) => Prop s a -> Prop s a
   recip = Unary $ \ x y -> do
      z <- known 1
      ctimes x y z
+  fromRational :: (PropagatedNum a, Eq a, Fractional a) => Rational -> Prop s a
   fromRational r = Nullary (known $ fromRational r)
 
 -- | most of these only spit out the primary branch when run backwards
 instance (PropagatedFloating a, Eq a, Floating a) => Floating (Prop s a) where
+  pi :: (PropagatedFloating a, Eq a, Floating a) => Prop s a
   pi = Nullary (known pi)
 
+  exp :: (PropagatedFloating a, Eq a, Floating a) => Prop s a -> Prop s a
   exp = Unary cexp
+  log :: (PropagatedFloating a, Eq a, Floating a) => Prop s a -> Prop s a
   log = Unary (flip cexp)
 
+  sqrt :: (PropagatedFloating a, Eq a, Floating a) => Prop s a -> Prop s a
   sqrt = Unary csqrt
 
+  (**) :: (PropagatedFloating a, Eq a, Floating a) => Prop s a -> Prop s a -> Prop s a
   x ** y = exp (x * log y)
 
+  logBase :: (PropagatedFloating a, Eq a, Floating a) => Prop s a -> Prop s a -> Prop s a
   logBase a b = log a / log b
 
+  sin :: (PropagatedFloating a, Eq a, Floating a) => Prop s a -> Prop s a
   sin = Unary csin
+  cos :: (PropagatedFloating a, Eq a, Floating a) => Prop s a -> Prop s a
   cos = Unary ccos
+  tan :: (PropagatedFloating a, Eq a, Floating a) => Prop s a -> Prop s a
   tan = Unary ctan
 
+  asin :: (PropagatedFloating a, Eq a, Floating a) => Prop s a -> Prop s a
   asin = Unary (flip csin)
+  acos :: (PropagatedFloating a, Eq a, Floating a) => Prop s a -> Prop s a
   acos = Unary (flip ccos)
+  atan :: (PropagatedFloating a, Eq a, Floating a) => Prop s a -> Prop s a
   atan = Unary (flip ctan)
 
+  sinh :: (PropagatedFloating a, Eq a, Floating a) => Prop s a -> Prop s a
   sinh = Unary csinh
+  cosh :: (PropagatedFloating a, Eq a, Floating a) => Prop s a -> Prop s a
   cosh = Unary ccosh
+  tanh :: (PropagatedFloating a, Eq a, Floating a) => Prop s a -> Prop s a
   tanh = Unary ctanh
 
+  asinh :: (PropagatedFloating a, Eq a, Floating a) => Prop s a -> Prop s a
   asinh = Unary (flip csinh)
+  acosh :: (PropagatedFloating a, Eq a, Floating a) => Prop s a -> Prop s a
   acosh = Unary (flip ccosh)
+  atanh :: (PropagatedFloating a, Eq a, Floating a) => Prop s a -> Prop s a
   atanh = Unary (flip ctanh)
 
 data DerefProp s u where
@@ -96,22 +125,26 @@ data DerefProp s u where
   DerefBinary  :: Propagated c => Proxy c -> (Cell s a -> Cell s b -> Cell s c -> ST s ()) -> u -> u -> DerefProp s u
 
 instance Functor (DerefProp s) where
+  fmap :: (a -> b) -> DerefProp s a -> DerefProp s b
   fmap _ (DerefNullary u)          = DerefNullary u
   fmap f (DerefUnary Proxy k a)    = DerefUnary Proxy k (f a)
   fmap f (DerefBinary Proxy k a b) = DerefBinary Proxy k (f a) (f b)
 
 instance Foldable (DerefProp s) where
+  foldMap :: Monoid m => (a -> m) -> DerefProp s a -> m
   foldMap _ (DerefNullary _)      = mempty
   foldMap f (DerefUnary _ _ a)    = f a
   foldMap f (DerefBinary _ _ a b) = f a `mappend` f b
 
 instance Traversable (DerefProp s) where
+  traverse :: Applicative f => (a -> f b) -> DerefProp s a -> f (DerefProp s b)
   traverse _ (DerefNullary u)          = pure $ DerefNullary u
   traverse f (DerefUnary Proxy k a)    = DerefUnary Proxy k <$> f a
   traverse f (DerefBinary Proxy k a b) = DerefBinary Proxy k <$> f a <*> f b
 
 instance MuRef (Prop s a) where
   type DeRef (Prop s a)     = DerefProp s
+  mapDeRef :: Applicative f => (forall b. (MuRef b, DeRef (Prop s a) ~ DeRef b) => b -> f u) -> Prop s a -> f (DeRef (Prop s a) u)
   mapDeRef _ (Nullary n)    = pure $ DerefNullary n
   mapDeRef f (Unary k a)    = DerefUnary Proxy k <$> f a
   mapDeRef f (Binary k a b) = DerefBinary Proxy k <$> f a <*> f b

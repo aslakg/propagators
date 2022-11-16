@@ -2,8 +2,8 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE InstanceSigs #-}
 
 module Data.Propagator.Cell where
 
@@ -21,6 +21,7 @@ data Cell s a = Cell
   {-# UNPACK #-} !(MutVar s (Maybe a, a -> ST s ()))
 
 instance Eq (Cell s a) where
+  (==) :: Cell s a -> Cell s a -> Bool
   Cell _ ra == Cell _ rb = ra == rb
 
 -- | Construct a new 'Cell' with no information.
@@ -41,7 +42,7 @@ write :: Cell s a -> a -> ST s ()
 write (Cell m r) a' = join $ atomicModifyMutVar' r $ \case
   (Nothing, ns) -> ((Just a', ns), ns a')
   old@(Just a, ns) -> case m a a' of
-    Contradiction xs e 
+    Contradiction xs e
       | HashSet.null xs -> (old, fail e)
       | e == ""         -> (old, fail "contradiction")
       | otherwise       -> (old, fail (e ++ ", supported by: " ++ intercalate ", " (show <$> toList xs)))

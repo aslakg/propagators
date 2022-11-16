@@ -4,6 +4,7 @@
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE InstanceSigs #-}
 
 module Data.Propagator.Class
   ( Change(..)
@@ -32,27 +33,36 @@ data Change a
   deriving (Functor, Foldable, Traversable)
 
 instance Applicative Change where
+  pure :: a -> Change a
   pure = Change False
+  (<*>) :: Change (a -> b) -> Change a -> Change b
   Change m f <*> Change n a = Change (m || n) (f a)
   Contradiction m n <*> _ = Contradiction m n
   _ <*> Contradiction m n = Contradiction m n
 
 instance Alternative Change where
+  empty :: Change a
   empty = Contradiction mempty "contradiction"
+  (<|>) :: Change a -> Change a -> Change a
   Contradiction{} <|> n = n
   m               <|> _ = m
   -- can we (evilly) intersect the contradiction set?
 
 instance Monad Change where
+  return :: a -> Change a
   return = Change False
+  (>>=) :: Change a -> (a -> Change b) -> Change b
   Change m a >>= f = case f a of
     Change n b -> Change (m || n) b
     Contradiction s n -> Contradiction s n
   Contradiction s n >>= _ = Contradiction s n
+  fail :: String -> Change a
   fail = Contradiction mempty
 
 instance MonadPlus Change where
+  mzero :: Change a
   mzero = Control.Applicative.empty
+  mplus :: Change a -> Change a -> Change a
   mplus = (<|>)
 
 -- | This is a viable default definition for 'merge' for most simple values.
@@ -82,6 +92,7 @@ instance Propagated Natural
 
 -- | Approximate equality (1e-6)
 instance Propagated Float where
+  merge :: Float -> Float -> Change Float
   merge a b
     | isNaN a && isNaN b                     = Change False a
     | isInfinite a && isInfinite b && a == b = Change False a
@@ -90,6 +101,7 @@ instance Propagated Float where
 
 -- | Approximate equality (1e-9)
 instance Propagated Double where
+  merge :: Double -> Double -> Change Double
   merge a b
     | isNaN a && isNaN b                     = Change False a
     | isInfinite a && isInfinite b && a == b = Change False a
@@ -97,15 +109,18 @@ instance Propagated Double where
     | otherwise = Contradiction mempty $ (showString "merge: " . showsPrec 10 a . showString " /= " . showsPrec 10 b) ""
 
 instance (Propagated a, Propagated b) => Propagated (a, b) where
+  merge :: (Propagated a, Propagated b) => (a, b) -> (a, b) -> Change (a, b)
   merge (a,b) (c,d) = (,) <$> merge a c <*> merge b d
 
 instance (Propagated a, Propagated b) => Propagated (Either a b) where
+  merge :: (Propagated a, Propagated b) => Either a b -> Either a b -> Change (Either a b)
   merge (Left a)  (Left b)  = Left <$> merge a b
   merge (Right a) (Right b) = Right <$> merge a b
   merge _ _ = fail "Left /= Right"
 
 -- | Propagated interval arithmetic
 instance (Num a, Ord a) => Propagated (Interval a) where
+  merge :: (Num a, Ord a) => Interval a -> Interval a -> Change (Interval a)
   merge (I a b) (I c d)
     | b < c || d < a = Change True Empty
     | otherwise      = Change (a < c || b > d) $ I (max a c) (min b d)

@@ -2,6 +2,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE InstanceSigs #-}
 module Data.Propagator.Num where
 
 import Control.Monad
@@ -59,6 +60,7 @@ instance PropagatedNum (Supported Integer) where
         watch y $ \ b -> when (b /= 0) $ write x 0
 
 instance PropagatedNum Natural where
+  ctimes :: Cell s Natural -> Cell s Natural -> Cell s Natural -> ST s ()
   ctimes x y z = do
     lift2 (*) x y z
     watch z $ \c ->
@@ -71,21 +73,25 @@ instance PropagatedNum Natural where
   cabs = unify
 
 instance PropagatedNum (Supported Natural) where
+  ctimes :: Cell s (Supported Natural) -> Cell s (Supported Natural) -> Cell s (Supported Natural) -> ST s ()
   ctimes x y z = do
     lift2 (*) x y z
     watch z $ \c ->
       when (c == 0) $ do
         watch x $ \ a -> when (a /= 0) $ write y 0
         watch y $ \ b -> when (b /= 0) $ write x 0
+  cabs :: Cell s (Supported Natural) -> Cell s (Supported Natural) -> ST s ()
   cabs = unify
 
 instance PropagatedNum Int
 instance PropagatedNum (Supported Int)
 
 instance PropagatedNum Word where
+  cabs :: Cell s Word -> Cell s Word -> ST s ()
   cabs = unify
 
 instance PropagatedNum (Supported Word) where
+  cabs :: Cell s (Supported Word) -> Cell s (Supported Word) -> ST s ()
   cabs = unify
 
 ctimesFractional :: (Eq a, Fractional a) => Cell s a -> Cell s a -> Cell s a -> ST s ()
@@ -107,21 +113,27 @@ ctimesFractional x y z = do
     with y $ \b -> when (b /= 0) $ write x (c/b)
 
 instance PropagatedNum Rational where
+  ctimes :: Cell s Rational -> Cell s Rational -> Cell s Rational -> ST s ()
   ctimes = ctimesFractional
 
 instance PropagatedNum (Supported Rational) where
+  ctimes :: Cell s (Supported Rational) -> Cell s (Supported Rational) -> Cell s (Supported Rational) -> ST s ()
   ctimes = ctimesFractional
 
 instance PropagatedNum Double where
+  ctimes :: Cell s Double -> Cell s Double -> Cell s Double -> ST s ()
   ctimes = ctimesFractional
 
 instance PropagatedNum (Supported Double) where
+  ctimes :: Cell s (Supported Double) -> Cell s (Supported Double) -> Cell s (Supported Double) -> ST s ()
   ctimes = ctimesFractional
 
 instance PropagatedNum Float where
+  ctimes :: Cell s Float -> Cell s Float -> Cell s Float -> ST s ()
   ctimes = ctimesFractional
 
 instance PropagatedNum (Supported Float) where
+  ctimes :: Cell s (Supported Float) -> Cell s (Supported Float) -> Cell s (Supported Float) -> ST s ()
   ctimes = ctimesFractional
 
 class PropagatedNum a => PropagatedFloating a where
@@ -195,20 +207,26 @@ class (Floating a, Ord a) => PropagatedInterval a where
 
 
 instance PropagatedInterval Double where
+  infinity :: Double
   infinity = 1/0
 
 instance PropagatedInterval (Supported Double) where
+  infinity :: Supported Double
   infinity = 1/0
 
 instance PropagatedInterval Float where
+  infinity :: Float
   infinity = 1/0
 
 instance PropagatedInterval (Supported Float) where
+  infinity :: Supported Float
   infinity = 1/0
 
 instance PropagatedInterval a => PropagatedNum (Interval a) where
+  ctimes :: PropagatedInterval a => Cell s (Interval a) -> Cell s (Interval a) -> Cell s (Interval a) -> ST s ()
   ctimes = ctimesFractional
 
+  cabs :: PropagatedInterval a => Cell s (Interval a) -> Cell s (Interval a) -> ST s ()
   cabs x y = do
     write y (0...infinity)
     lift1 abs x y
@@ -217,6 +235,7 @@ instance PropagatedInterval a => PropagatedNum (Interval a) where
       I _ b -> write x (-b...b)
       Empty -> write x Empty
 
+  csignum :: PropagatedInterval a => Cell s (Interval a) -> Cell s (Interval a) -> ST s ()
   csignum x y = do
     write y (-1...1)
     lift1 signum x y
@@ -242,40 +261,48 @@ periodic p f x y = do
     I l h -> write x (c + p*(fromIntegral (ceiling l :: Integer)...fromIntegral (floor h :: Integer)))
 
 instance (PropagatedInterval a, RealFloat a) => PropagatedFloating (Interval a) where
+  cexp :: (PropagatedInterval a, RealFloat a) => Cell s (Interval a) -> Cell s (Interval a) -> ST s ()
   cexp x y = do
     write y (0...infinity)
     lift1 exp x y
     lift1 log y x
 
+  csqrt :: (PropagatedInterval a, RealFloat a) => Cell s (Interval a) -> Cell s (Interval a) -> ST s ()
   csqrt x y = do
     write x (0...infinity)
     lift1 (\b -> b*b) y x
     symmetric_positive sqrt x y
 
+  csin :: (PropagatedInterval a, RealFloat a) => Cell s (Interval a) -> Cell s (Interval a) -> ST s ()
   csin x y = do
     write y (-1...1)
     lift1 sin x y
     periodic (2*pi) asin y x
 
+  ccos :: (PropagatedInterval a, RealFloat a) => Cell s (Interval a) -> Cell s (Interval a) -> ST s ()
   ccos x y = do
     write y (-1...1)
     lift1 cos x y
     periodic (2*pi) acos y x
 
+  ctan :: (PropagatedInterval a, RealFloat a) => Cell s (Interval a) -> Cell s (Interval a) -> ST s ()
   ctan x y = do
     write y (-pi/2...pi/2)
     lift1 tan x y
     periodic pi atan y x
 
+  csinh :: (PropagatedInterval a, RealFloat a) => Cell s (Interval a) -> Cell s (Interval a) -> ST s ()
   csinh x y = do
     lift1 sinh x y
     lift1 asinh y x
 
+  ccosh :: (PropagatedInterval a, RealFloat a) => Cell s (Interval a) -> Cell s (Interval a) -> ST s ()
   ccosh x y = do
     write y (1...infinity)
     lift1 cosh x y
     symmetric_positive acosh x y
 
+  ctanh :: (PropagatedInterval a, RealFloat a) => Cell s (Interval a) -> Cell s (Interval a) -> ST s ()
   ctanh x y = do
     write y (-1...1)
     lift1 tanh x y
