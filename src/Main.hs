@@ -17,8 +17,3 @@ test =
 
 test1 :: ST s (Cell s (Supported Int))
 test1 = known test
-
-test2 = do 
-                a <- test1
-
-                return $ merge a a

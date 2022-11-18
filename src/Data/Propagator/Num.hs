@@ -38,6 +38,7 @@ class Propagated a => PropagatedNum a where
     watch y $ \b -> when (b == 0) $ write x 0
 
 instance PropagatedNum Integer where
+  ctimes :: Cell s Integer -> Cell s Integer -> Cell s Integer -> ST s ()
   ctimes x y z = do
     lift2 (*) x y z
     watch z $ \c ->
@@ -52,6 +53,7 @@ instance PropagatedNum Integer where
       -- propagate backwards with div?
 
 instance PropagatedNum (Supported Integer) where
+  ctimes :: Cell s (Supported Integer) -> Cell s (Supported Integer) -> Cell s (Supported Integer) -> ST s ()
   ctimes x y z = do
     lift2 (*) x y z
     watch z $ \c -> 

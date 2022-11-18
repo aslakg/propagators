@@ -19,3 +19,4 @@ codex.tags
 .stack-work
 dist-newstyle
 *.lock
+.vscode

@@ -62,6 +62,7 @@ executable prop
   main-is: Main.hs
   hs-source-dir: src
   default-language: Haskell2010  
+  other-extensions:    OverloadedStrings
   other-modules:
     Data.Propagator
     Data.Propagator.Cell
@@ -78,4 +79,12 @@ executable prop
     intervals ,
     primitive,
     unique,
-    unordered-containers
+    unordered-containers,
+    wai-extra >=3.0.0,
+    wai-middleware-static,
+    scotty,
+    clay,
+    text,
+    blaze-html,
+    blaze-markup,
+    aeson
