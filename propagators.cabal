@@ -42,6 +42,7 @@ library
     intervals ,
     primitive,
     unique,
+    containers,
     unordered-containers
 
   exposed-modules:
@@ -71,6 +72,7 @@ executable prop
     Data.Propagator.Num
     Data.Propagator.Prop
     Data.Propagator.Supported
+    Examples.Sudoku4
   build-depends:
     base,
     data-reify,
